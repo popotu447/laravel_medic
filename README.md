@@ -23,7 +23,7 @@ To polecenie:
 
 - zbuduje kontener z PHP, SQLite i Composerem,
 - zainstaluje zależności PHP,
-- uruchomi serwer aplikacji Laravel na `http://localhost:8000`.
+- uruchomi serwer aplikacji Laravel na `http://localhost:8000` i kolejkę.
 
 ### 3. Wygeneruj klucz aplikacji (raz)
 
