@@ -5,53 +5,48 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePatientFileRequest;
 use App\Http\Requests\UpdatePatientFileRequest;
+use App\Http\Resources\FileResource;
 use App\Models\File;
 use App\Models\Patient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Services\FileStorageService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class PatientFileController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(Patient $patient)
+    use AuthorizesRequests;
+
+    public function __construct(private FileStorageService $fileStorage)
     {
-        if ($patient->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-        return response()->json($patient->files);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    public function index(Patient $patient)
+    {
+        $this->authorize('view', $patient);
+        return FileResource::collection($patient->files);
+    }
+
     public function store(StorePatientFileRequest $request, Patient $patient)
     {
-        $path = $request->file('file')->store('uploads', 'public');
+        $this->authorize('createFile', $patient);
 
+        $path = $this->fileStorage->store($request->file('file'));
         $file = $patient->files()->create([
             'description' => $request->input('description'),
             'path' => $path,
         ]);
 
-        return response()->json([
-            'message' => 'Plik zapisany.',
-            'data' => $file,
-            'url' => Storage::url($file->path),
-        ], 201);
+        return (new FileResource($file))
+            ->additional(['message' => 'Plik został zapisany.']);
+
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(File $file)
     {
-        if ($file->patient->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $this->authorize('view', $file);
 
-        $path = storage_path('app/public/' . $file->path);
+        $path = $this->fileStorage->fullPath($file->path);
 
         if (!file_exists($path)) {
             return response()->json(['message' => 'Plik nie istnieje na serwerze.'], 404);
@@ -63,47 +58,38 @@ class PatientFileController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(UpdatePatientFileRequest $request, File $file)
     {
+
+        $this->authorize('update', $file);
+
         if ($request->hasFile('file')) {
-            if (Storage::disk('public')->exists($file->path)) {
-                Storage::disk('public')->delete($file->path);
-            }
+            Storage::disk('public')->delete($file->path);
 
             $file->path = $request->file('file')->store('uploads', 'public');
         }
 
-        if ($request->filled('description')) {
+        if ($request->has('description')) {
             $file->description = $request->input('description');
         }
 
         $file->save();
 
-        return response()->json([
-            'message' => 'Plik zaktualizowany.',
-            'data' => $file,
-            'url' => Storage::url($file->path),
-        ]);
+        return (new FileResource($file))
+            ->additional(['message' => 'Plik został zaktualizowany.']);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(File $file)
     {
-        if ($file->patient->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $this->authorize('delete', $file);
 
-        if (Storage::disk('public')->exists($file->path)) {
-            Storage::disk('public')->delete($file->path);
-        }
+        $this->fileStorage->delete($file->path);
 
         $file->delete();
 
-        return response()->json(['message' => 'Plik został usunięty.'], 200);
+        return (new FileResource($file))
+            ->additional(['message' => 'Plik został usunięty.']);
+
     }
+
 }
