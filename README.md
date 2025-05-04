@@ -124,6 +124,12 @@ docker compose exec app php artisan test
 
 ---
 
+## Autor
+
+Marcin Bednarski  
+
+---
+
 ## 📃 Licencja
 
 MIT © 2025
