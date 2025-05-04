@@ -1,161 +1,129 @@
-# 📁 Laravel API – Zarządzanie plikami pacjentów
+# Laravel Medic API
 
-To API umożliwia autoryzowanym użytkownikom przeglądanie, dodawanie, edytowanie i usuwanie plików (PDF) przypisanych do pacjentów.
-
----
-
-## 🔐 Autoryzacja – Basic Auth
-
-Każde żądanie do API wymaga uwierzytelnienia przy użyciu **Basic Auth**.
-
-### Przykładowi użytkownicy:
-
-| E-mail                | Hasło   |
-|------------------------|---------|
-| `doctor1@example.com` | `haslo1` |
-| `doctor2@example.com` | `haslo2` |
+Prosty backend API do zarządzania pacjentami i ich plikami PDF. Zbudowany w Laravel 11, uruchamiany w kontenerze Docker. Obsługuje uwierzytelnianie Basic Auth, upload plików PDF oraz REST API.
 
 ---
 
-## 📄 Endpoints
+## 🚀 Jak uruchomić aplikację
 
-### 🧑‍⚕️ 1. Lista pacjentów zalogowanego lekarza
+### 1. Sklonuj repozytorium
 
+```bash
+git clone https://github.com/popotu447/laravel_medic.git
+cd laravel_medic
 ```
+
+### 2. Uruchom aplikację w Dockerze
+
+```bash
+docker compose up --build
+```
+
+To polecenie:
+
+- zbuduje kontener z PHP, SQLite i Composerem,
+- zainstaluje zależności PHP,
+- uruchomi serwer aplikacji Laravel na `http://localhost:8000`.
+
+### 3. Wygeneruj klucz aplikacji (raz)
+
+```bash
+docker compose exec app php artisan key:generate
+```
+
+---
+
+## 🔐 Domyślni użytkownicy (Basic Auth)
+
+| Email                  | Hasło   |
+|------------------------|---------|
+| `doctor1@example.com`  | `haslo1` |
+| `doctor2@example.com`  | `haslo2` |
+
+---
+
+## 📦 API – wybrane endpointy
+
+### Lista pacjentów zalogowanego użytkownika
+
+```http
 GET /api/patients
 ```
 
-Zwraca wszystkich pacjentów przypisanych do aktualnie zalogowanego użytkownika (lekarza). Wymaga Basic Auth.
+### Upload pliku PDF do pacjenta
 
-**Przykład:**
-
-```bash
-curl -u doctor1@example.com:haslo1 http://localhost:8000/api/patients
-```
-
----
-
-### 🔍 2. Lista plików danego pacjenta
-
-```
-GET /api/patients/{patient}/files
-```
-
-Zwraca wszystkie pliki przypisane do pacjenta należącego do zalogowanego użytkownika.
-
-**Przykład:**
-
-```bash
-curl -u doctor1@example.com:haslo1 http://localhost:8000/api/patients/1/files
-```
-
----
-
-### 📤 3. Dodanie nowego pliku (PDF)
-
-```
+```http
 POST /api/patients/{patient}/files
 ```
 
-**Parametry (multipart/form-data):**
+Dane formularza:
+- `file` (plik PDF, maks. 10 MB),
+- `description` (opcjonalny tekst)
 
-- `file` – plik PDF (wymagany)
-- `description` – opis pliku (opcjonalny)
+### Lista plików pacjenta
 
-**Przykład:**
-
-```bash
-curl -u doctor1@example.com:haslo1 \
-  -X POST http://localhost:8000/api/patients/1/files \
-  -F "file=@/ścieżka/do/plik.pdf" \
-  -F "description=Wynik badania"
+```http
+GET /api/patients/{patient}/files
 ```
 
----
+### Podgląd pliku PDF
 
-### ✏️ 4. Aktualizacja pliku
-
-```
-PUT /api/files/{file}
-```
-
-Jeśli wysyłasz plik, użyj metody POST + `_method=PUT`.
-
-**Przykład:**
-
-```bash
-curl -u doctor1@example.com:haslo1 \
-  -X POST http://localhost:8000/api/files/7 \
-  -F "_method=PUT" \
-  -F "description=Nowy opis" \
-  -F "file=@nowy_plik.pdf"
-```
-
----
-
-### 🗑️ 5. Usuwanie pliku
-
-```
-DELETE /api/files/{file}
-```
-
-**Przykład:**
-
-```bash
-curl -u doctor1@example.com:haslo1 \
-  -X DELETE http://localhost:8000/api/files/7
-```
-
----
-
-### 📂 6. Pobranie pliku
-
-```
+```http
 GET /api/files/{file}
 ```
 
-Wyświetla PDF w przeglądarce (nagłówek `Content-Disposition: inline`).
+Zwraca PDF inline (jeśli istnieje) lub błąd JSON.
 
----
+### Usunięcie pliku
 
-## ⚙️ Wymagania środowiska
-
-- PHP 8.1+
-- Laravel 11
-- Kolejki: `php artisan queue:work` (jeśli upload jest asynchroniczny)
-- Pliki są przechowywane w: `storage/app/public/uploads`
-
-Uruchom komendę:
-
-```bash
-php artisan storage:link
+```http
+DELETE /api/files/{file}
 ```
 
-aby umożliwić dostęp do plików przez URL (`/storage/...`).
+---
+
+## 🗄 Praca z bazą danych SQLite
+
+Plik bazy znajduje się w:
+
+```
+database/database.sqlite
+```
+
+Jest dołączony do repozytorium, więc dane testowe będą dostępne od razu po uruchomieniu.
 
 ---
 
-## 📌 Uwagi
+## 🧪 Testy i dane
 
-- Użytkownik może zarządzać **tylko plikami pacjentów, których jest właścicielem**
-- Obsługiwane są wyłącznie pliki **PDF**
-- Maksymalny rozmiar pliku określa zmienna `.env`:  
-  `PATIENT_FILE_MAX_SIZE=10240` (czyli 10 MB)
+### Wykonanie migracji i seeda:
+
+```bash
+docker compose exec app php artisan migrate:fresh --seed
+```
+
+Seeder tworzy:
+
+- 2 użytkowników (`doctor1`, `doctor2`),
+- po 2 pacjentów na użytkownika,
+- pliki testowe PDF dla każdego pacjenta.
+
+### Uruchomienie testów PHPUnit:
+
+```bash
+docker compose exec app php artisan test
+```
 
 ---
 
-## ✅ Status odpowiedzi
 
-| Kod | Znaczenie             |
-|-----|------------------------|
-| 200 | OK                     |
-| 201 | Plik utworzony         |
-| 202 | Plik przyjęty do kolejki |
-| 403 | Brak dostępu (unauthorized) |
-| 404 | Nie znaleziono         |
+## 🛠 Wymagania
+
+- Docker + Docker Compose
+- Brak potrzeby instalowania PHP, Composera ani SQLite lokalnie
 
 ---
 
-## 🤝 Kontakt
+## 📃 Licencja
 
-Projekt prywatny – stworzony na potrzeby dokumentowania i testowania REST API.
+MIT © 2025
