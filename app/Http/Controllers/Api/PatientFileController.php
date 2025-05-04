@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePatientFileRequest;
 use App\Http\Requests\UpdatePatientFileRequest;
 use App\Http\Resources\FileResource;
+use App\Jobs\StorePatientFileJob;
 use App\Models\File;
 use App\Models\Patient;
 use Illuminate\Http\Request;
@@ -31,15 +32,21 @@ class PatientFileController extends Controller
     {
         $this->authorize('createFile', $patient);
 
-        $path = $this->fileStorage->store($request->file('file'));
         $file = $patient->files()->create([
             'description' => $request->input('description'),
-            'path' => $path,
+            'path' => null
         ]);
 
-        return (new FileResource($file))
-            ->additional(['message' => 'Plik został zapisany.']);
+        $tmpFile = $request->file('file');
+        $filename = uniqid() . '.' . $tmpFile->getClientOriginalExtension();
+        $tmpFullPath = $tmpFile->move(storage_path('app/tmp'), $filename)->getPathname();
 
+        $tmpRelativePath = str_replace(storage_path('app') . '/', '', $tmpFullPath);
+
+        StorePatientFileJob::dispatch($tmpRelativePath, $file->id);
+
+        return (new FileResource($file))
+            ->additional(['message' => 'Plik zostanie zapisany asynchronicznie.']);
     }
 
     public function show(File $file)
@@ -48,7 +55,7 @@ class PatientFileController extends Controller
 
         $path = $this->fileStorage->fullPath($file->path);
 
-        if (!file_exists($path)) {
+        if (!file_exists($path) || !is_file($path)) {
             return response()->json(['message' => 'Plik nie istnieje na serwerze.'], 404);
         }
 
@@ -64,9 +71,8 @@ class PatientFileController extends Controller
         $this->authorize('update', $file);
 
         if ($request->hasFile('file')) {
-            Storage::disk('public')->delete($file->path);
-
-            $file->path = $request->file('file')->store('uploads', 'public');
+            $this->fileStorage->delete($file->path);
+            $file->path = $this->fileStorage->store($request->file('file'));
         }
 
         if ($request->has('description')) {
