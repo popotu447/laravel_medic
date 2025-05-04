@@ -1,6 +1,5 @@
 FROM php:8.2-cli
 
-# Instalacja zależności systemowych
 RUN apt-get update && apt-get install -y \
     unzip \
     zip \
@@ -11,16 +10,18 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     && docker-php-ext-install pdo pdo_sqlite zip
 
-# Dodanie Composera
+# Dodaj composera
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Skopiuj pliki projektu (na potrzeby `composer install`)
-COPY . /var/www/html
-
+# Ustaw katalog roboczy
 WORKDIR /var/www/html
 
-# Zainstaluj zależności (cache dla warstwy)
-RUN composer install --no-interaction --prefer-dist --no-scripts
+# Skopiuj pliki (ważne: najpierw composer.json dla cachowania)
+COPY composer.json composer.lock* ./
 
-# Domyślne polecenie — serwer Laravel
+RUN composer install --no-interaction --prefer-dist
+
+# Skopiuj całą resztę projektu (po composer install)
+COPY . .
+
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
