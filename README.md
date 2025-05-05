@@ -106,7 +106,6 @@ Seeder tworzy:
 
 - 2 użytkowników (`doctor1`, `doctor2`),
 - po 2 pacjentów na użytkownika,
-- pliki testowe PDF dla każdego pacjenta.
 
 ### Uruchomienie testów PHPUnit:
 
